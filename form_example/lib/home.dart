@@ -1,6 +1,7 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:dio/dio.dart';
 
 enum PageState {
   CHOOSING_FILE,
@@ -32,6 +33,27 @@ class _HomePageState extends State<HomePage> {
     setState(() {
       state = PageState.LOADING;
     });
+    FormData formData =  FormData.fromMap({
+      "name": "wendux",
+      "age": 25,
+      "file": image,
+    });
+
+    await Dio().post(
+      'https://httpbin.org/post',
+      data: formData,
+      onSendProgress: (count, total) {
+        print(count/total);
+        setState(() {
+          loadPercent = count/total;
+        });
+      },
+    );
+    setState(() {
+      state = PageState.FINISH;
+      loadPercent = 0;
+    });
+
   }
 
   Widget _buildImage() {

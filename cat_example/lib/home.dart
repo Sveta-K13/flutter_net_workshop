@@ -1,5 +1,8 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:dio/dio.dart';
+import 'package:dio_cookie_manager/dio_cookie_manager.dart';
+import 'package:cookie_jar/cookie_jar.dart';
 
 class HomePage extends StatefulWidget {
   HomePage({Key key, this.title}) : super(key: key);
@@ -12,8 +15,45 @@ class HomePage extends StatefulWidget {
 class _HomePageState extends State<HomePage> {
   String text;
   String imageUrl;
-  void _sendRequest() async {
+  bool isCached = false;
+  Dio dio = Dio();
+  InterceptorsWrapper cacheInterceptor;
 
+  @override
+  void initState() {
+    dio.interceptors.add(LogInterceptor());
+    cacheInterceptor = InterceptorsWrapper(
+      onRequest: (options) {
+        return dio.resolve({ 'text': 'Cats are awesome!' });
+      },
+      onResponse: (response) {
+        return response;
+      }
+    );
+    CookieJar cookieJar = CookieJar();
+    dio.interceptors.add(CookieManager(cookieJar));
+    dio.options.baseUrl = 'https://cat-fact.herokuapp.com/facts';
+    super.initState();
+  }
+
+  void _sendRequest() async {
+    try {
+      Response response = await dio.get('/random/');
+      setState(() {
+        text = response.data['text'];
+        if (response?.statusCode != null) {
+          imageUrl = 'https://http.cat/${response.statusCode}';
+        }
+      });
+    } catch (error) {
+      setState(() {
+        text = error?.message;
+        int errorCode = error?.response?.statusCode;
+        if (errorCode != null) {
+          imageUrl = 'https://http.cat/$errorCode';
+        }
+      });
+    }
   }
 
   @override
@@ -35,7 +75,26 @@ class _HomePageState extends State<HomePage> {
             ),
             RaisedButton(
               onPressed: _sendRequest,
-              child: Text('send request'),
+              child: Text('update fact'),
+            ),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: <Widget>[
+                Text('enable cache'),
+                Switch(
+                  value: isCached,
+                  onChanged: (value) {
+                    setState(() {
+                      isCached = value;
+                      if (isCached) {
+                        dio.interceptors.add(cacheInterceptor);
+                      } else {
+                        dio.interceptors.remove(cacheInterceptor);
+                      }
+                    });
+                  }
+                )
+              ],
             ),
           ],
         ),
